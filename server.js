@@ -11,7 +11,6 @@ const io = new Server(server);
 let waitingPlayer = null;
 
 io.on("connection", (socket) => {
-    console.log("Jogador conectado:", socket.id);
 
     if (waitingPlayer) {
         const room = "room-" + socket.id;
@@ -20,7 +19,12 @@ io.on("connection", (socket) => {
         waitingPlayer.join(room);
 
         io.to(room).emit("start", {
-            room: room
+            room,
+            players: {
+                [waitingPlayer.id]: "red",
+                [socket.id]: "blue"
+            },
+            turn: "red"
         });
 
         waitingPlayer = null;
@@ -29,15 +33,11 @@ io.on("connection", (socket) => {
         socket.emit("waiting");
     }
 
-    socket.on("move", ({ room, move }) => {
-        socket.to(room).emit("move", move);
+    socket.on("move", ({ room, move, player }) => {
+        socket.to(room).emit("move", { move, player });
     });
 
-    socket.on("disconnect", () => {
-        if (waitingPlayer === socket) waitingPlayer = null;
-    });
 });
-
 const PORT = process.env.PORT || 3000;
 
 server.listen(PORT, () => {
