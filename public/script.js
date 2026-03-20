@@ -1,4 +1,4 @@
-const socket = io();
+const socket = io("https://dama-online-za71.onrender.com");
 
 const boardEl = document.getElementById("board");
 const statusEl = document.getElementById("status");
@@ -6,6 +6,8 @@ const statusEl = document.getElementById("status");
 let board = [];
 let selected = null;
 let room = null;
+let myColor = null;
+let currentTurn = null;
 
 socket.on("waiting", () => {
     statusEl.innerText = "Aguardando outro jogador...";
@@ -13,12 +15,17 @@ socket.on("waiting", () => {
 
 socket.on("start", (data) => {
     room = data.room;
-    statusEl.innerText = "Partida iniciada!";
+    myColor = data.players[socket.id];
+    currentTurn = data.turn;
+
+    statusEl.innerText = "Você é: " + myColor;
+
     initBoard();
 });
 
-socket.on("move", (move) => {
+socket.on("move", ({ move, player }) => {
     applyMove(move);
+    currentTurn = player === "red" ? "blue" : "red";
     draw();
 });
 
@@ -29,8 +36,8 @@ function initBoard() {
             board[r][c] = null;
 
             if ((r + c) % 2) {
-                if (r < 3) board[r][c] = { color: "blue", king: false };
-                if (r > 4) board[r][c] = { color: "red", king: false };
+                if (r < 3) board[r][c] = { color: "blue" };
+                if (r > 4) board[r][c] = { color: "red" };
             }
         }
     }
@@ -50,7 +57,6 @@ function draw() {
             if (board[r][c]) {
                 const p = document.createElement("div");
                 p.className = "piece " + board[r][c].color;
-                if (board[r][c].king) p.classList.add("king");
                 cell.appendChild(p);
             }
 
@@ -60,24 +66,25 @@ function draw() {
 }
 
 function click(r, c) {
+    if (currentTurn !== myColor) return;
+
     if (!selected) {
-        selected = { r, c };
+        if (board[r][c] && board[r][c].color === myColor) {
+            selected = { r, c };
+        }
     } else {
         const move = { from: selected, to: { r, c } };
+
         applyMove(move);
-        socket.emit("move", { room, move });
+        socket.emit("move", { room, move, player: myColor });
+
+        currentTurn = myColor === "red" ? "blue" : "red";
         selected = null;
     }
 }
 
 function applyMove(move) {
     const { from, to } = move;
-
     board[to.r][to.c] = board[from.r][from.c];
     board[from.r][from.c] = null;
-
-    // virar dama
-    const piece = board[to.r][to.c];
-    if (piece.color === "red" && to.r === 0) piece.king = true;
-    if (piece.color === "blue" && to.r === 7) piece.king = true;
 }
